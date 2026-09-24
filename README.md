@@ -117,6 +117,10 @@ Releasing: bump the version with `npm version patch|minor|major` and push the ta
 GitHub Actions (.github/workflows/publish.yml) builds and publishes the package to npm
 with a provenance statement.
 
+## Author
+
+Created and maintained by **Ramil Galeev** — [github.com/ramilgaleev79](https://github.com/ramilgaleev79).
+
 ## License
 
 [MIT](LICENSE)
