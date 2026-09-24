@@ -21,6 +21,8 @@ jobs:
           # Node 24 ships npm 11.x, which supports OIDC trusted publishing
           node-version: '24'
           cache: 'npm'
+          # Writes //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN} into .npmrc
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
 
