@@ -1,0 +1,23 @@
+{
+	"node": "n8n-nodes-exceljs.ExcelJs",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": [
+		"Core Nodes",
+		"Data & Storage"
+	],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/ramilgaleev79/n8n-nodes-exceljs#readme"
+			}
+		]
+	},
+	"alias": [
+		"excel",
+		"xlsx",
+		"spreadsheet",
+		"csv",
+		"xls"
+	]
+}

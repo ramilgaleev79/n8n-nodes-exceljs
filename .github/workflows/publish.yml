@@ -1,0 +1,34 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: read
+  # Mint the OIDC token npm uses to sign the provenance statement
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 24 ships npm 11.x, which supports OIDC trusted publishing
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          # Used when the package is not configured as an npm Trusted Publisher;
+          # create a Granular Access Token on npmjs.com and add it as a repo secret.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
