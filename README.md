@@ -91,7 +91,7 @@ for the read operations.
 ### Conditional Formatting
 | Operation | Description |
 |---|---|
-| Add Rule | `cellIs` (greater than, less than, equal, between) or `containsText` rules with a highlight fill |
+| Add Rule | `cellIs` (greater than, less than, equal, between — between takes a min and a max value) or `containsText` (highlight cells containing a text) rules with a highlight fill |
 
 ## Formula hyperlinks
 

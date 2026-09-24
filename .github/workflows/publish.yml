@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    # windows: test/cf.js shells out to PowerShell Expand-Archive to unzip the xlsx
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +28,9 @@ jobs:
       - run: npm ci
 
       - run: npm run build
+
+      # windows runner matches test/cf.js which shells out to PowerShell Expand-Archive
+      - run: npm test
 
       - name: Publish to npm
         run: npm publish --provenance --access public

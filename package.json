@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-exceljs",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"description": "n8n community node for reading, creating and manipulating Excel (.xlsx) files, powered by ExcelJS",
 	"keywords": [
 		"n8n-community-node-package",
@@ -24,7 +24,8 @@
 	"scripts": {
 		"typecheck": "tsc --noEmit",
 		"build": "npm run typecheck && node scripts/build.js",
-		"prepublishOnly": "npm run build"
+		"test": "node test/smoke.js && node test/subtitle.js && node test/cf.js",
+		"prepublishOnly": "npm run build && npm test"
 	},
 	"files": [
 		"dist"
@@ -35,6 +36,9 @@
 		"nodes": [
 			"dist/nodes/ExcelJs/ExcelJs.node.js"
 		]
+	},
+	"engines": {
+		"node": ">=18"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",

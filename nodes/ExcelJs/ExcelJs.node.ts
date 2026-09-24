@@ -106,6 +106,25 @@ function findBinaryItemIndex(allItems: INodeExecutionData[], propName: string): 
 	return -1;
 }
 
+// Display labels for the node subtitle, keyed by resource -> operation -> label.
+// Kept in sync with the option lists above; smoke-tested by test/subtitle.js.
+const OPERATION_LABELS: Record<string, Record<string, string>> = {
+	workbook: { create: 'Create', getInfo: 'Get Info', setProperties: 'Set Properties' },
+	worksheet: { add: 'Add', getAll: 'Get All', remove: 'Remove', rename: 'Rename', protect: 'Protect', unprotect: 'Unprotect', freeze: 'Freeze Panes', autoFilter: 'Set Auto Filter', setProperties: 'Set Properties', pageSetup: 'Set Page Setup' },
+	cell: { readValue: 'Read Value', readHyperlink: 'Read Hyperlink', writeValue: 'Write Value', writeFormula: 'Write Formula', setStyle: 'Set Style', merge: 'Merge Cells', unmerge: 'Unmerge Cells', addHyperlink: 'Add Hyperlink', setNumFmt: 'Set Number Format' },
+	row: { addRow: 'Add Row', addRows: 'Add Rows', getRow: 'Get Row', setHeight: 'Set Height', hide: 'Hide', show: 'Show' },
+	column: { setWidth: 'Set Width', hide: 'Hide', show: 'Show' },
+	range: { writeData: 'Write Data', readData: 'Read Data', readHyperlinks: 'Read Hyperlinks', setStyle: 'Set Style' },
+	image: { add: 'Add Image' },
+	conditionalFormatting: { addRule: 'Add Rule' },
+};
+
+// "0" must stay numeric: Number(v) || v would turn it back into a string (0 is falsy)
+function toNumOrStr(raw: string): number | string {
+	const trimmed = raw.trim();
+	return trimmed !== '' && !isNaN(Number(trimmed)) ? Number(trimmed) : raw;
+}
+
 export class ExcelJs implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'ExcelJS',
@@ -113,8 +132,9 @@ export class ExcelJs implements INodeType {
 		icon: 'file:exceljs.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["resource"] + ": " + $parameter["operation"]}}',
+		subtitle: `={{ ${JSON.stringify(OPERATION_LABELS)}[$parameter.resource][$parameter.operation] || $parameter.operation }}`,
 		description: 'Read, create and manipulate Excel files using ExcelJS',
+		documentationUrl: 'https://github.com/ramilgaleev79/n8n-nodes-exceljs#readme',
 		defaults: {
 			name: 'ExcelJS',
 		},
@@ -845,12 +865,23 @@ export class ExcelJs implements INodeType {
 				displayOptions: { show: { resource: ['conditionalFormatting'], operation: ['addRule'], cfType: ['cellIs'] } },
 			},
 			{
-				displayName: 'Value / Formula',
+				displayName: 'Value / Text',
 				name: 'cfFormula',
 				type: 'string',
 				required: true,
 				default: '100',
+				description: 'Comparison value, or the text to search for when the rule type is Contains Text. For Between this is the minimum value.',
 				displayOptions: { show: { resource: ['conditionalFormatting'], operation: ['addRule'] } },
+			},
+			{
+				displayName: 'Second Value (Max)',
+				name: 'cfSecondValue',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: '200',
+				description: 'Maximum value, only used with the Between operator',
+				displayOptions: { show: { resource: ['conditionalFormatting'], operation: ['addRule'], cfOperator: ['between'] } },
 			},
 			{
 				displayName: 'Fill Color (ARGB)',
@@ -1183,8 +1214,10 @@ export class ExcelJs implements INodeType {
 							throw new Error('The number of frozen rows/columns cannot be negative.');
 						}
 						const ws = requireSheet(workbook, sheetName);
-						// Correct topLeftCell for columns >= Z (colNumberToLetter instead of fromCharCode)
+						// Correct topLeftCell for columns >= Z (colNumberToLetter instead of fromCharCode);
+						// spread the existing view so zoom and other settings survive
 						ws.views = [{
+							...((ws.views[0] as any) || {}),
 							state: 'frozen',
 							xSplit: cols,
 							ySplit: rows,
@@ -1208,7 +1241,8 @@ export class ExcelJs implements INodeType {
 						}
 						if (tabColor) ws.properties.tabColor = { argb: tabColor.replace('#', '') };
 						ws.state = state as any;
-						ws.views = [{ zoomScale: zoom }];
+						// spread the existing view so frozen panes survive setting the zoom
+						ws.views = [{ ...((ws.views[0] as any) || {}), zoomScale: zoom }];
 					} else if (operation === 'pageSetup') {
 						const ws = requireSheet(workbook, sheetName);
 						const orientation = this.getNodeParameter('pageOrientation', i) as string;
@@ -1542,18 +1576,25 @@ export class ExcelJs implements INodeType {
 					const formulaVal = this.getNodeParameter('cfFormula', i) as string;
 					const fillColor = this.getNodeParameter('cfFillColor', i) as string;
 					if (!formulaVal.trim()) {
-						throw new Error('The value/formula for conditional formatting cannot be empty.');
+						throw new Error('The value/text for conditional formatting cannot be empty.');
 					}
 					// For a solid pattern the fill color is set via fgColor (not bgColor)
-					const rule: any = {
-						type: cfType,
-						formulae: [Number(formulaVal) || formulaVal],
-						style: {
-							fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } },
-						},
-					};
-					if (cfType === 'cellIs') {
-						rule.operator = this.getNodeParameter('cfOperator', i);
+					const style = { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } } };
+					let rule: any;
+					if (cfType === 'containsText') {
+						// ExcelJS expects text + operator for containsText (formulae is ignored)
+						rule = { type: 'containsText', operator: 'containsText', text: formulaVal, style };
+					} else {
+						const formulae: (number | string)[] = [toNumOrStr(formulaVal)];
+						const cfOperator = this.getNodeParameter('cfOperator', i) as string;
+						if (cfOperator === 'between') {
+							const secondRaw = this.getNodeParameter('cfSecondValue', i, '') as string;
+							if (!String(secondRaw).trim()) {
+								throw new Error('The "Second Value (Max)" is required for the Between operator.');
+							}
+							formulae.push(toNumOrStr(String(secondRaw)));
+						}
+						rule = { type: 'cellIs', operator: cfOperator, formulae, style };
 					}
 					ws.addConditionalFormatting({ ref: range, rules: [rule] });
 				}
